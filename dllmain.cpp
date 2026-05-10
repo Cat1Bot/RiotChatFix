@@ -4,7 +4,7 @@
 
 static uintptr_t FindPattern(uintptr_t base, size_t size, const uint8_t* pattern, const char* mask)
 {
-    for (size_t i = 0; i < size; i++)
+    for (size_t i = 0; i <= size - strlen(mask); i++)
     {
         bool found = true;
 
@@ -30,19 +30,17 @@ static bool PatchTLS(uintptr_t moduleBase)
     auto nt = (PIMAGE_NT_HEADERS)(moduleBase + dos->e_lfanew);
     size_t size = nt->OptionalHeader.SizeOfImage;
 
-    uint8_t pattern[] = {0x66, 0x41, 0xC7, 0x86, 0xBD, 0x0B, 0x00, 0x00, 0x00, 0x00};
+    uint8_t pattern[] = { 0x66, 0x41, 0xC7, 0x00, 0xBD, 0x0B, 0x00, 0x00, 0x01, 0x00 };
 
-    const char* mask = "xxxxxxxx??";
+    const char* mask = "xxx?xxxxxx";
 
     uintptr_t instr = FindPattern(moduleBase, size, pattern, mask);
-    if (!instr)
-        return false;
+    if (!instr) return false;
 
     DWORD oldProtect;
-    if (!VirtualProtect((LPVOID)instr, 10, PAGE_EXECUTE_READWRITE, &oldProtect))
-        return false;
+    if (!VirtualProtect((LPVOID)instr, 10, PAGE_EXECUTE_READWRITE, &oldProtect)) return false;
 
-    *(uint16_t*)(instr + 8) = 0;
+    *(uint8_t*)(instr + 8) = 0;
 
     VirtualProtect((LPVOID)instr, 10, oldProtect, &oldProtect);
     FlushInstructionCache(GetCurrentProcess(), (LPCVOID)instr, 10);
